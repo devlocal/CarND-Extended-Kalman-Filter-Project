@@ -6,7 +6,9 @@
 #include <vector>
 #include <string>
 #include <fstream>
-#include "kalman_filter.h"
+#include "lidar.h"
+#include "radar.h"
+#include "state.h"
 #include "tools.h"
 
 class FusionEKF {
@@ -17,19 +19,11 @@ public:
   FusionEKF();
 
   /**
-  * Destructor.
-  */
-  virtual ~FusionEKF();
-
-  /**
   * Run the whole flow of the Kalman Filter from here.
   */
   void ProcessMeasurement(const MeasurementPackage &measurement_pack);
 
-  /**
-  * Kalman Filter update and prediction math lives in here.
-  */
-  KalmanFilter ekf_;
+  const ekf::State& GetState() const { return state_; }
 
 private:
   // check whether the tracking toolbox was initialized or not (first measurement)
@@ -38,12 +32,23 @@ private:
   // previous timestamp
   long long previous_timestamp_;
 
-  // tool object used to compute Jacobian and RMSE
-  Tools tools;
-  Eigen::MatrixXd R_laser_;
-  Eigen::MatrixXd R_radar_;
-  Eigen::MatrixXd H_laser_;
-  Eigen::MatrixXd Hj_;
+  ekf::State state_;
+  ekf::Radar radar_;
+  ekf::Lidar lidar_;
+
+  static const float NOISE_AX;
+  static const float NOISE_AY;
+
+  /**
+   * Computes initial value of state covariance matrix P
+   */
+  static Eigen::MatrixXd GetInitialP();
+
+  /**
+   * Initializes EKF
+   * @param measurement_pack initial measurement
+   */
+  void Initialize(const MeasurementPackage &measurement_pack);
 };
 
 #endif /* FusionEKF_H_ */

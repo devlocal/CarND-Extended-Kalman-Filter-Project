@@ -1,128 +1,53 @@
-# Extended Kalman Filter Project Starter Code
+# Extended Kalman Filter Project
 Self-Driving Car Engineer Nanodegree Program
 
-In this project you will utilize a kalman filter to estimate the state of a moving object of interest with noisy lidar and radar measurements. Passing the project requires obtaining RMSE values that are lower that the tolerance outlined in the project rubric. 
+This project utilizes a Kalman filter to estimate the state of a moving object of interest with noisy lidar and radar measurements. 
 
-This project involves the Term 2 Simulator which can be downloaded [here](https://github.com/udacity/self-driving-car-sim/releases)
+## Project structure
 
-This repository includes two files that can be used to set up and install [uWebSocketIO](https://github.com/uWebSockets/uWebSockets) for either Linux or Mac systems. For windows you can use either Docker, VMware, or even [Windows 10 Bash on Ubuntu](https://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/) to install uWebSocketIO. Please see [this concept in the classroom](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/16cf4a78-4fc7-49e1-8621-3450ca938b77) for the required version and installation scripts.
+Project structure has been changed compared to the starter code.
 
-Once the install for uWebSocketIO is complete, the main program can be built and run by doing the following from the project top directory.
+`kalman_filter.*` files have been decomposed into `state.*`, `lidar.*` and `radar.*` to handle process state, laser updates and radar updates respectively.
 
-1. mkdir build
-2. cd build
-3. cmake ..
-4. make
-5. ./ExtendedKF
-
-Tips for setting up your environment can be found [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
-
-Note that the programs that need to be written to accomplish the project are src/FusionEKF.cpp, src/FusionEKF.h, kalman_filter.cpp, kalman_filter.h, tools.cpp, and tools.h
-
-The program main.cpp has already been filled out, but feel free to modify it.
-
-Here is the main protcol that main.cpp uses for uWebSocketIO in communicating with the simulator.
+CMakeLists.txt has been changed to include new files.
 
 
-INPUT: values provided by the simulator to the c++ program
+[main.cpp](src/main.cpp) has two new boolean constants `kUseRadar` and `kUseLidar` which can be set to `false` to "turn off" either radar or lidar sensor. Lines 97-106 of the file implement appropriate checks.
 
-["sensor_measurement"] => the measurement that the simulator observed (either lidar or radar)
+[tools.cpp](src/tools.cpp) implements `CalculateRMSE` and `CalculateJacobian`. The first function `CalculateRMSE` performs sanity checks for empty input (line 13) and equal length of estimations and ground truth vectors (line 17). `CalculateJacobian` checks if state is at the zero point. Both functions throw `std::runtime_error` if validation fails.
 
+[FusionEKF.h](src/FusionEKF.h) has member variables for `ekf::State`, `ekf::Radar` and `ekf::Lidar` (lines 35-37). New functions have been introduced: `InitializeEKF`, `GetInitialP` and `GetState`.
 
-OUTPUT: values provided by the c++ program to the simulator
+[FusionEKF.cpp](src/FusionEKF.cpp) initializes `state_`, `radar_` and `lidar_` members (line 17). `state_` is initialized with pre-defined constant values for `NOISE_AX`, `NOISE_AY` and initial value of `P_` provided by `GetInitialP` function. Function `Initialize` (line 32) initializes the state. Based on sensor type, different code is executed. For radar measurement, coordinates are computed from polar to cartesian. For laser measurement, coordinates are used as is. `ProcessMeasurement` function calls `Initialize` for the first measurement. For subsequent measurements, it performs Kalman filter steps to predict the state by calling `state_.Predict` (line 71) and update: `radar_.Update` is called for radar measurement (line 79), `lidar_.Update` is called for laser measurement (line 82).
 
-["estimate_x"] <= kalman filter estimated position x
-["estimate_y"] <= kalman filter estimated position y
-["rmse_x"]
-["rmse_y"]
-["rmse_vx"]
-["rmse_vy"]
+[state.h](src/state.h) contains member variables for state vector `x_` (line 11) and state covariance matrix `P_` (line 14). Additionally, it holds values for process noise `noise_ax_` and `noise_ay_` (lines 40-41), state transition matrix `F_` (line 44) and process covariance matrix `Q_` (line 47).
 
----
+[state.cpp](src/state.cpp) initializes member variables in constructor (lines 8-27). Function `Predict` (lines 33-43) performs Kalman filter predict step. Function `ComputeQ` computes process covariance matrix Q using time distance from previous measurement `delta_T`.
 
-## Other Important Dependencies
+[radar.h](src/radar.h) contains member variables for measurement covariance matrix `R_` (line 27) and identity matix `I_` (line 28). Additionally, it holds references `state_` (line 26) and value of `pi_` (line 29).
 
-* cmake >= 3.5
-  * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1 (Linux, Mac), 3.81 (Windows)
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools](https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
+[radar.cpp](src/radar.cpp) initializes values in constructor (lines 10-16). Function `PolarToCartesian` (lines 18-29) performs conversion of radar measurement from polar coordinates to cartesian coordinates. Functions `h` (lines 31-46) implements measurement function for radar sensor. Function `Update` (lines 48-76) performs Kalman filter update step for radar. The first step performed by the function is the check if current state is at point `(0, 0)` (lines 51-54). If state is at zero, Jacobian matrix cannot be computed and measured values is assigned to state. Otherwise full update step is performed.
 
-## Basic Build Instructions
+[lidar.h](src/lidar.h) contains member variables for identity matrix `I_`, measurement matrix `H_`, transposed measurement matrix `Ht_` and measurement covariance matrix `R_` (lines 21-24). It also holds reference `state_` (line 20). Storing a value of transposed matrix `Ht_` allows to avoid computing it every time an update is performed.
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make` 
-   * On windows, you may need to run: `cmake .. -G "Unix Makefiles" && make`
-4. Run it: `./ExtendedKF `
+[lidar.cpp](src/lidar.cpp) initializes member variables in constructor (lines 8-20). Function `Update` (lines 22-32) performs Kalman filter update step for laser measurements.
 
-## Editor Settings
+## Process visualization
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+Process visualization provided by the simulator shows expected results: estimated track (green dots) is averaged from radar and lidar measurements (blue and red dots).
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+![Process Visualization](media/process.png)
 
-## Code Style
+## Tracking Accuracy
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+| Sensors         | X RMSE | Y RMSE | VX RMSE | VY RMSE |
+|:---------------:|:------:|:------:|:-------:|:-------:|
+| Radar and Lidar | 0.0973 | 0.0855 | 0.4513  | 0.4399  |
+| Lidar only      | 0.1222 | 0.0984 | 0.5825  | 0.4567  |
+| Radar only      | 0.1918 | 0.2798 | 0.5575  | 0.6567  |
 
-## Generating Additional Data
+![RMSE](media/rmse.png)
 
-This is optional!
+The observed accuracy results match expectations based on accuracy of sensors and the algorithm of Kalman filter. Radar only measurements has the highest RMSE (i.e. the lowest accuracy). Laser only measurements provide lower RMSE (i.e. higher accuracy) than radar only measurements. Fusing both radar and lidar measurements with the help of Kalman filters allows to achieve higher accuracy than what can be achieved by using any of the sensors alone.
 
-If you'd like to generate your own radar and lidar data, see the
-[utilities repo](https://github.com/udacity/CarND-Mercedes-SF-Utilities) for
-Matlab scripts that can generate additional data.
-
-## Project Instructions and Rubric
-
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
-
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project resources page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/382ebfd6-1d55-4487-84a5-b6a5a4ba1e47)
-for instructions and the project rubric.
-
-## Hints and Tips!
-
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
-* Students have reported rapid expansion of log files when using the term 2 simulator.  This appears to be associated with not being connected to uWebSockets.  If this does occur,  please make sure you are conneted to uWebSockets. The following workaround may also be effective at preventing large log files.
-
-    + create an empty log file
-    + remove write permissions so that the simulator can't write to log
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
-
-However! We'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Regardless of the IDE used, every submitted project must
-still be compilable with cmake and make.
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
-
+These observations confirm that sensor fusion with the help of Kalman filter is a powerful technique to improve accuracy of objects tracking.

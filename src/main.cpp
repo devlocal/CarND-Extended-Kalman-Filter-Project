@@ -10,6 +10,9 @@ using namespace std;
 // for convenience
 using json = nlohmann::json;
 
+constexpr bool kUseRadar = true;  // Set to false to skip radar measurements
+constexpr bool kUseLidar = true;  // Set to false to skip lidar measurements
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -90,6 +93,18 @@ int main()
           		iss >> timestamp;
           		meas_package.timestamp_ = timestamp;
           }
+
+          // Skip radar or laser measurement if configured to do so
+          bool skip_measurement =
+            (meas_package.sensor_type_ == MeasurementPackage::LASER && !kUseLidar) ||
+            (meas_package.sensor_type_ == MeasurementPackage::RADAR && !kUseRadar);
+          
+          if (skip_measurement) {
+            std::string msg = "42[\"manual\",{}]";
+            ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            return;
+          }
+
           float x_gt;
     	  float y_gt;
     	  float vx_gt;
@@ -112,10 +127,11 @@ int main()
 
     	  VectorXd estimate(4);
 
-    	  double p_x = fusionEKF.ekf_.x_(0);
-    	  double p_y = fusionEKF.ekf_.x_(1);
-    	  double v1  = fusionEKF.ekf_.x_(2);
-    	  double v2 = fusionEKF.ekf_.x_(3);
+        const ekf::State& state = fusionEKF.GetState();
+    	  double p_x = state.x_(0);
+    	  double p_y = state.x_(1);
+    	  double v1  = state.x_(2);
+    	  double v2 = state.x_(3);
 
     	  estimate(0) = p_x;
     	  estimate(1) = p_y;
